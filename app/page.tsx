@@ -41,6 +41,25 @@ const defaultData: LibraryData = {
 
 export default function Page() {
   const supabase = createClient();
+  const [theme, setTheme] = useState<'dark' | 'light' | 'cyberpunk'>('dark');
+
+  // Initialize theme from localStorage on mount
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('library-theme') as 'dark' | 'light' | 'cyberpunk' | null;
+    if (savedTheme && ['dark', 'light', 'cyberpunk'].includes(savedTheme)) {
+      setTheme(savedTheme);
+      document.documentElement.setAttribute('data-theme', savedTheme);
+    } else {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  }, []);
+
+  const handleThemeChange = (newTheme: 'dark' | 'light' | 'cyberpunk') => {
+    setTheme(newTheme);
+    localStorage.setItem('library-theme', newTheme);
+    document.documentElement.setAttribute('data-theme', newTheme);
+  };
+
   const [activeTab, setActiveTab] = useState<'books' | 'customers' | 'transactions'>('books');
   const [data, setData] = useState<LibraryData>(defaultData);
   const [isLoading, setIsLoading] = useState(true);
@@ -300,6 +319,25 @@ export default function Page() {
 
   return (
     <main className="library-shell">
+      <header className="header-bar">
+        <div className="logo-section">
+          <span className="logo-icon">📚</span>
+          <span className="logo-text">LibFlow</span>
+        </div>
+        <div className="theme-control">
+          <span>Theme:</span>
+          <select
+            className="theme-select"
+            value={theme}
+            onChange={(e) => handleThemeChange(e.target.value as 'dark' | 'light' | 'cyberpunk')}
+          >
+            <option value="dark">Slate Dark</option>
+            <option value="light">Emerald Mint</option>
+            <option value="cyberpunk">Cyberpunk Neon</option>
+          </select>
+        </div>
+      </header>
+
       <section className="hero">
         <div>
           <p className="eyebrow">Library management</p>

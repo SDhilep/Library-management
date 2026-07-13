@@ -41,20 +41,20 @@ const defaultData: LibraryData = {
 
 export default function Page() {
   const supabase = createClient();
-  const [theme, setTheme] = useState<'dark' | 'light' | 'cyberpunk'>('dark');
+  const [theme, setTheme] = useState<'default' | 'light' | 'dark'>('default');
 
   // Initialize theme from localStorage on mount
   useEffect(() => {
-    const savedTheme = localStorage.getItem('library-theme') as 'dark' | 'light' | 'cyberpunk' | null;
-    if (savedTheme && ['dark', 'light', 'cyberpunk'].includes(savedTheme)) {
+    const savedTheme = localStorage.getItem('library-theme') as 'default' | 'light' | 'dark' | null;
+    if (savedTheme && ['default', 'light', 'dark'].includes(savedTheme)) {
       setTheme(savedTheme);
       document.documentElement.setAttribute('data-theme', savedTheme);
     } else {
-      document.documentElement.setAttribute('data-theme', 'dark');
+      document.documentElement.setAttribute('data-theme', 'default');
     }
   }, []);
 
-  const handleThemeChange = (newTheme: 'dark' | 'light' | 'cyberpunk') => {
+  const handleThemeChange = (newTheme: 'default' | 'light' | 'dark') => {
     setTheme(newTheme);
     localStorage.setItem('library-theme', newTheme);
     document.documentElement.setAttribute('data-theme', newTheme);
@@ -329,22 +329,18 @@ export default function Page() {
           <select
             className="theme-select"
             value={theme}
-            onChange={(e) => handleThemeChange(e.target.value as 'dark' | 'light' | 'cyberpunk')}
+            onChange={(e) => handleThemeChange(e.target.value as 'default' | 'light' | 'dark')}
           >
-            <option value="dark">Slate Dark</option>
-            <option value="light">Emerald Mint</option>
-            <option value="cyberpunk">Cyberpunk Neon</option>
+            <option value="default">default</option>
+            <option value="light">light</option>
+            <option value="dark">dark</option>
           </select>
         </div>
       </header>
 
-      <section className="hero">
-        <div>
-          <p className="eyebrow">Library management</p>
-          <h1>Track books, members, and circulation</h1>
-          <p className="subtitle">A database-backed library manager powered by Supabase.</p>
-        </div>
-      </section>
+      <div className="page-header">
+        <h1 className="page-title">LIBRARY MANAGEMENT</h1>
+      </div>
 
       <div className="tabs" role="tablist">
         {['books', 'customers', 'transactions'].map((tab) => (

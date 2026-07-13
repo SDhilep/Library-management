@@ -60,7 +60,7 @@ export default function Page() {
     document.documentElement.setAttribute('data-theme', newTheme);
   };
 
-  const [activeTab, setActiveTab] = useState<'books' | 'customers' | 'transactions'>('books');
+  const [activeTab, setActiveTab] = useState<'books' | 'customers' | 'transactions' | 'history'>('books');
   const [data, setData] = useState<LibraryData>(defaultData);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -331,9 +331,9 @@ export default function Page() {
             value={theme}
             onChange={(e) => handleThemeChange(e.target.value as 'default' | 'light' | 'dark')}
           >
-            <option value="default">default</option>
-            <option value="light">light</option>
-            <option value="dark">dark</option>
+            <option value="default">Default</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
           </select>
         </div>
       </header>
@@ -343,17 +343,23 @@ export default function Page() {
       </div>
 
       <div className="tabs" role="tablist">
-        {['books', 'customers', 'transactions'].map((tab) => (
+        {['books', 'customers', 'transactions', 'history'].map((tab) => (
           <button
             key={tab}
             type="button"
             className={activeTab === tab ? 'tab active' : 'tab'}
             onClick={() => {
-              setActiveTab(tab as 'books' | 'customers' | 'transactions');
+              setActiveTab(tab as 'books' | 'customers' | 'transactions' | 'history');
               setFormMessage('');
             }}
           >
-            {tab === 'books' ? 'Books' : tab === 'customers' ? 'Customers' : 'Issue / Return'}
+            {tab === 'books'
+              ? 'Books'
+              : tab === 'customers'
+              ? 'Customers'
+              : tab === 'transactions'
+              ? 'Issue / Return'
+              : 'Transaction History'}
           </button>
         ))}
       </div>
@@ -578,7 +584,11 @@ export default function Page() {
                   </button>
                 </div>
               </section>
+            </div>
+          )}
 
+          {activeTab === 'history' && (
+            <div className="grid single-column">
               <section className="panel list-panel">
                 <div className="panel-header">
                   <h2>Transaction history</h2>

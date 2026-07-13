@@ -39,6 +39,35 @@ const defaultData: LibraryData = {
   transactions: [],
 };
 
+const formatTimestamp = (isoString: string | null) => {
+  if (!isoString) return '—';
+  try {
+    return new Date(isoString).toLocaleString();
+  } catch (e) {
+    return isoString;
+  }
+};
+
+const getDurationString = (issuedAtStr: string | null, returnedAtStr: string | null) => {
+  if (!issuedAtStr) return '';
+  const start = new Date(issuedAtStr);
+  const end = returnedAtStr ? new Date(returnedAtStr) : new Date();
+  const diffMs = end.getTime() - start.getTime();
+  if (diffMs < 0) return '';
+
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffDays > 0) {
+    return `${diffDays} day${diffDays > 1 ? 's' : ''}${returnedAtStr ? '' : ' active'}`;
+  }
+  if (diffHours > 0) {
+    return `${diffHours} hour${diffHours > 1 ? 's' : ''}${returnedAtStr ? '' : ' active'}`;
+  }
+  return `${diffMins} min${diffMins > 1 ? 's' : ''}${returnedAtStr ? '' : ' active'}`;
+};
+
 export default function Page() {
   const supabase = createClient();
   const [theme, setTheme] = useState<'default' | 'light' | 'dark'>('default');
@@ -87,7 +116,7 @@ export default function Page() {
         customerId: tx.customer_id,
         bookId: tx.book_id,
         action: tx.action,
-        timestamp: tx.timestamp ? new Date(tx.timestamp).toLocaleString() : '',
+        timestamp: tx.timestamp ?? '',
       }));
 
       setData({
@@ -155,15 +184,53 @@ export default function Page() {
     }));
   }, [data.books, data.customers]);
 
-  const visibleTransactions = useMemo(
-    () =>
-      data.transactions.map((transaction) => ({
-        ...transaction,
-        customer: data.customers.find((customer) => customer.id === transaction.customerId),
-        book: data.books.find((book) => book.id === transaction.bookId),
-      })),
-    [data.transactions, data.customers, data.books],
-  );
+  const groupedTransactions = useMemo(() => {
+    const sorted = [...data.transactions].sort(
+      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
+    
+    const grouped: Array<{
+      id: string;
+      customerId: string;
+      bookId: string;
+      issuedAt: string | null;
+      returnedAt: string | null;
+    }> = [];
+
+    const activeBorrows: { [key: string]: typeof grouped[number] } = {};
+
+    for (const tx of sorted) {
+      const key = `${tx.customerId}_${tx.bookId}`;
+      if (tx.action === 'Issue') {
+        const record = {
+          id: tx.id,
+          customerId: tx.customerId,
+          bookId: tx.bookId,
+          issuedAt: tx.timestamp,
+          returnedAt: null,
+        };
+        grouped.push(record);
+        activeBorrows[key] = record;
+      } else if (tx.action === 'Return') {
+        const active = activeBorrows[key];
+        if (active && !active.returnedAt) {
+          active.returnedAt = tx.timestamp;
+          delete activeBorrows[key];
+        } else {
+          const record = {
+            id: tx.id,
+            customerId: tx.customerId,
+            bookId: tx.bookId,
+            issuedAt: null,
+            returnedAt: tx.timestamp,
+          };
+          grouped.push(record);
+        }
+      }
+    }
+
+    return grouped.reverse();
+  }, [data.transactions]);
 
   const handleBookSave = async () => {
     if (!bookForm.title || !bookForm.author || !bookForm.genre) {
@@ -322,7 +389,7 @@ export default function Page() {
       <header className="header-bar">
         <div className="logo-section">
           <span className="logo-icon">📚</span>
-          <span className="logo-text">LibFlow</span>
+          <span className="logo-text">Smart Library</span>
         </div>
         <div className="theme-control">
           <span>Theme:</span>
@@ -592,20 +659,64 @@ export default function Page() {
               <section className="panel list-panel">
                 <div className="panel-header">
                   <h2>Transaction history</h2>
-                  <span>{data.transactions.length} records</span>
+                  <span>{groupedTransactions.length} records</span>
                 </div>
-                {data.transactions.length === 0 ? (
+                {groupedTransactions.length === 0 ? (
                   <div className="empty">No transactions yet.</div>
                 ) : (
-                  visibleTransactions.map((entry) => (
-                    <article key={entry.id} className="item-card transaction-card">
-                      <div>
-                        <strong>{entry.action}</strong>
-                        <p>{entry.customer?.name ?? 'Unknown customer'} · {entry.book?.title ?? 'Unknown book'}</p>
-                        <span>{entry.timestamp}</span>
-                      </div>
-                    </article>
-                  ))
+                  groupedTransactions.map((entry) => {
+                    const customer = data.customers.find((c) => c.id === entry.customerId);
+                    const book = data.books.find((b) => b.id === entry.bookId);
+                    const duration = getDurationString(entry.issuedAt, entry.returnedAt);
+                    
+                    return (
+                      <article key={entry.id} className="item-card transaction-card-premium">
+                        <div className="transaction-info-header">
+                          <span className={`badge status-badge ${entry.returnedAt ? 'returned' : 'borrowed'}`}>
+                            {entry.returnedAt ? 'Completed' : 'Active Borrow'}
+                          </span>
+                          {duration && <span className="duration-tag">⏱️ {duration}</span>}
+                        </div>
+                        
+                        <div className="transaction-details">
+                          <div className="detail-section">
+                            <span className="section-label">Borrower</span>
+                            <strong className="detail-name">{customer?.name ?? 'Unknown'}</strong>
+                            {customer && <span className="badge membership-badge-small">{customer.membership}</span>}
+                          </div>
+                          
+                          <div className="detail-section">
+                            <span className="section-label">Book Details</span>
+                            <strong className="detail-name">{book?.title ?? 'Unknown Book'}</strong>
+                            <p className="detail-subtext">{book ? `${book.author} · ${book.genre}` : ''}</p>
+                          </div>
+                          
+                          <div className="detail-timeline">
+                            <div className="timeline-item">
+                              <span className="dot start"></span>
+                              <div className="timeline-text-group">
+                                <span className="time-label">Issued</span>
+                                <span className="time-value">{formatTimestamp(entry.issuedAt)}</span>
+                              </div>
+                            </div>
+                            <div className="timeline-item">
+                              <span className={`dot ${entry.returnedAt ? 'end' : 'pending'}`}></span>
+                              <div className="timeline-text-group">
+                                <span className="time-label">Returned</span>
+                                <span className="time-value return-value">
+                                  {entry.returnedAt ? (
+                                    formatTimestamp(entry.returnedAt)
+                                  ) : (
+                                    <span className="pulsing-text">Pending Return</span>
+                                  )}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })
                 )}
               </section>
             </div>

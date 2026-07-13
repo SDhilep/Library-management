@@ -557,7 +557,7 @@ button.secondary:hover {
 
 .transaction-details {
   display: grid;
-  grid-template-columns: 1fr 1fr 1.2fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 1.5rem;
 }
 
@@ -718,4 +718,146 @@ button.secondary:hover {
     border-color: var(--card-border);
     box-shadow: none;
   }
+}
+
+/* Edit/Delete Actions in Transaction Header */
+.transaction-actions-header {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.transaction-actions-header button {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.78rem;
+  border-radius: 6px;
+}
+
+/* Modal Overlay & Form styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.65);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.modal-content {
+  background: var(--panel-bg);
+  border: 1px solid var(--panel-border);
+  border-radius: 16px;
+  padding: 2rem;
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  animation: modalFadeIn 0.25s ease-out;
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-color);
+  cursor: pointer;
+  margin-bottom: 1.25rem;
+}
+
+.checkbox-label input {
+  width: auto;
+  cursor: pointer;
+}
+
+/* Customer Item Card Adjustments for expanded History */
+.customer-item-card {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+}
+
+.customer-card-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.customer-history-section {
+  margin-top: 1.25rem;
+  border-top: 1px solid var(--panel-border);
+  padding-top: 1rem;
+  width: 100%;
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.customer-history-section h4 {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--eyebrow-color);
+  margin: 0 0 0.75rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.no-history-text {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  margin: 0.5rem 0 0;
+}
+
+.customer-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.history-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.12);
+  padding: 0.65rem 0.9rem;
+  border-radius: 8px;
+  border: 1px solid var(--card-border);
+}
+
+[data-theme="light"] .history-list-item {
+  background: rgba(148, 163, 184, 0.06);
+}
+
+.history-book-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-color);
+  max-width: 45%;
+}
+
+.history-dates {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.history-status-badge {
+  font-size: 0.72rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
 }

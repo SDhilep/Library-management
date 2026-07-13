@@ -68,6 +68,17 @@ const getDurationString = (issuedAtStr: string | null, returnedAtStr: string | n
   return `${diffMins} min${diffMins > 1 ? 's' : ''}${returnedAtStr ? '' : ' active'}`;
 };
 
+const formatForDateTimeLocal = (dateStr: string | null) => {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr);
+    const pad = (n: number) => n.toString().padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  } catch (e) {
+    return '';
+  }
+};
+
 export default function Page() {
   const supabase = createClient();
   const [theme, setTheme] = useState<'default' | 'light' | 'dark'>('default');
@@ -108,6 +119,16 @@ export default function Page() {
   const [editingBookId, setEditingBookId] = useState<string | null>(null);
   const [editingCustomerId, setEditingCustomerId] = useState<string | null>(null);
   const [formMessage, setFormMessage] = useState('');
+
+  const [editingTransaction, setEditingTransaction] = useState<any | null>(null);
+  const [editTxForm, setEditTxForm] = useState({
+    customerId: '',
+    bookId: '',
+    issuedAt: '',
+    returnedAt: '',
+    isReturned: false,
+  });
+  const [expandedCustomerHistory, setExpandedCustomerHistory] = useState<{ [customerId: string]: boolean }>({});
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -216,6 +237,8 @@ export default function Page() {
     
     const grouped: Array<{
       id: string;
+      issueTxId: string | null;
+      returnTxId: string | null;
       customerId: string;
       bookId: string;
       issuedAt: string | null;
@@ -229,10 +252,12 @@ export default function Page() {
       if (tx.action === 'Issue') {
         const record = {
           id: tx.id,
+          issueTxId: tx.id,
+          returnTxId: null as string | null,
           customerId: tx.customerId,
           bookId: tx.bookId,
           issuedAt: tx.timestamp,
-          returnedAt: null,
+          returnedAt: null as string | null,
         };
         grouped.push(record);
         activeBorrows[key] = record;
@@ -240,13 +265,16 @@ export default function Page() {
         const active = activeBorrows[key];
         if (active && !active.returnedAt) {
           active.returnedAt = tx.timestamp;
+          active.returnTxId = tx.id;
           delete activeBorrows[key];
         } else {
           const record = {
             id: tx.id,
+            issueTxId: null as string | null,
+            returnTxId: tx.id,
             customerId: tx.customerId,
             bookId: tx.bookId,
-            issuedAt: null,
+            issuedAt: null as string | null,
             returnedAt: tx.timestamp,
           };
           grouped.push(record);
@@ -403,6 +431,119 @@ export default function Page() {
         .eq('id', id);
       if (err) throw err;
       setFormMessage('Customer deleted.');
+      fetchData();
+    } catch (err: any) {
+      setFormMessage(`Error: ${err.message}`);
+    }
+  };
+
+  const toggleCustomerHistory = (customerId: string) => {
+    setExpandedCustomerHistory((prev) => ({
+      ...prev,
+      [customerId]: !prev[customerId],
+    }));
+  };
+
+  const removeTransaction = async (entry: any) => {
+    if (!confirm('Are you sure you want to delete this transaction record?')) return;
+    try {
+      const idsToDelete = [entry.issueTxId, entry.returnTxId].filter((id): id is string => !!id);
+      if (idsToDelete.length > 0) {
+        const { error: err } = await supabase
+          .from('transactions')
+          .delete()
+          .in('id', idsToDelete);
+        if (err) throw err;
+      }
+
+      // If it was an active borrow (not returned), reset the book status to Available
+      if (!entry.returnedAt) {
+        const { error: bookErr } = await supabase
+          .from('books')
+          .update({ status: 'Available' })
+          .eq('id', entry.bookId);
+        if (bookErr) throw bookErr;
+      }
+
+      setFormMessage('Transaction record deleted.');
+      fetchData();
+    } catch (err: any) {
+      setFormMessage(`Error: ${err.message}`);
+    }
+  };
+
+  const startEditTransaction = (entry: any) => {
+    setEditingTransaction(entry);
+    setEditTxForm({
+      customerId: entry.customerId,
+      bookId: entry.bookId,
+      issuedAt: formatForDateTimeLocal(entry.issuedAt),
+      returnedAt: formatForDateTimeLocal(entry.returnedAt),
+      isReturned: !!entry.returnedAt,
+    });
+  };
+
+  const handleEditTransactionSave = async () => {
+    if (!editingTransaction) return;
+    try {
+      // 1. Update the Issue transaction
+      if (editingTransaction.issueTxId) {
+        const { error: issueErr } = await supabase
+          .from('transactions')
+          .update({
+            customer_id: editTxForm.customerId,
+            book_id: editTxForm.bookId,
+            timestamp: editTxForm.issuedAt ? new Date(editTxForm.issuedAt).toISOString() : null,
+          })
+          .eq('id', editingTransaction.issueTxId);
+        if (issueErr) throw issueErr;
+      }
+
+      // 2. Handle Return transaction
+      if (editTxForm.isReturned) {
+        if (editingTransaction.returnTxId) {
+          const { error: returnErr } = await supabase
+            .from('transactions')
+            .update({
+              customer_id: editTxForm.customerId,
+              book_id: editTxForm.bookId,
+              timestamp: editTxForm.returnedAt ? new Date(editTxForm.returnedAt).toISOString() : null,
+            })
+            .eq('id', editingTransaction.returnTxId);
+          if (returnErr) throw returnErr;
+        } else {
+          const { error: returnErr } = await supabase
+            .from('transactions')
+            .insert({
+              customer_id: editTxForm.customerId,
+              book_id: editTxForm.bookId,
+              action: 'Return',
+              timestamp: editTxForm.returnedAt ? new Date(editTxForm.returnedAt).toISOString() : new Date().toISOString(),
+            });
+          if (returnErr) throw returnErr;
+        }
+      } else if (editingTransaction.returnTxId) {
+        const { error: delErr } = await supabase
+          .from('transactions')
+          .delete()
+          .eq('id', editingTransaction.returnTxId);
+        if (delErr) throw delErr;
+      }
+
+      // 3. Update book statuses
+      if (editingTransaction.bookId !== editTxForm.bookId) {
+        await supabase.from('books').update({ status: 'Available' }).eq('id', editingTransaction.bookId);
+      }
+      
+      const newStatus = editTxForm.isReturned ? 'Available' : 'Issued';
+      const { error: bookErr } = await supabase
+        .from('books')
+        .update({ status: newStatus })
+        .eq('id', editTxForm.bookId);
+      if (bookErr) throw bookErr;
+
+      setFormMessage('Transaction updated successfully.');
+      setEditingTransaction(null);
       fetchData();
     } catch (err: any) {
       setFormMessage(`Error: ${err.message}`);
@@ -607,20 +748,56 @@ export default function Page() {
                   <div className="empty">No customers added yet.</div>
                 ) : (
                   data.customers.map((customer) => (
-                    <article key={customer.id} id={`customer-card-${customer.id}`} className="item-card">
-                      <div>
-                        <strong>{customer.name}</strong>
-                        <p>{customer.email} · {customer.phone}</p>
-                        <span className="badge">{customer.membership}</span>
+                    <article key={customer.id} id={`customer-card-${customer.id}`} className="item-card customer-item-card">
+                      <div className="customer-card-main">
+                        <div>
+                          <strong>{customer.name}</strong>
+                          <p>{customer.email} · {customer.phone}</p>
+                          <span className="badge">{customer.membership}</span>
+                        </div>
+                        <div className="item-actions">
+                          <button type="button" className="secondary" onClick={() => toggleCustomerHistory(customer.id)}>
+                            {expandedCustomerHistory[customer.id] ? 'Hide History' : 'History'}
+                          </button>
+                          <button type="button" onClick={() => setEditingCustomerId(customer.id)}>
+                            Edit
+                          </button>
+                          <button type="button" className="secondary" onClick={() => removeCustomer(customer.id)}>
+                            Delete
+                          </button>
+                        </div>
                       </div>
-                      <div className="item-actions">
-                        <button type="button" onClick={() => setEditingCustomerId(customer.id)}>
-                          Edit
-                        </button>
-                        <button type="button" className="secondary" onClick={() => removeCustomer(customer.id)}>
-                          Delete
-                        </button>
-                      </div>
+                      
+                      {expandedCustomerHistory[customer.id] && (
+                        <div className="customer-history-section">
+                          <h4>Borrowing History</h4>
+                          {(() => {
+                            const customerHistory = groupedTransactions.filter((tx) => tx.customerId === customer.id);
+                            if (customerHistory.length === 0) {
+                              return <p className="no-history-text">No borrowing history found.</p>;
+                            }
+                            return (
+                              <div className="customer-history-list">
+                                {customerHistory.map((item) => {
+                                  const book = data.books.find((b) => b.id === item.bookId);
+                                  return (
+                                    <div key={item.id} className="history-list-item">
+                                      <span className="history-book-title">{book?.title ?? 'Unknown Book'}</span>
+                                      <div className="history-dates">
+                                        <span>Issued: {formatTimestamp(item.issuedAt)}</span>
+                                        <span>Returned: {item.returnedAt ? formatTimestamp(item.returnedAt) : 'Pending'}</span>
+                                      </div>
+                                      <span className={`badge history-status-badge ${item.returnedAt ? 'returned' : 'borrowed'}`}>
+                                        {item.returnedAt ? 'Returned' : 'Active'}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
                     </article>
                   ))
                 )}
@@ -700,7 +877,22 @@ export default function Page() {
                           <span className={`badge status-badge ${entry.returnedAt ? 'returned' : 'borrowed'}`}>
                             {entry.returnedAt ? 'Completed' : 'Active Borrow'}
                           </span>
-                          {duration && <span className="duration-tag">⏱️ {duration}</span>}
+                          <div className="transaction-actions-header">
+                            {duration && <span className="duration-tag">⏱️ {duration}</span>}
+                            <button
+                              type="button"
+                              onClick={() => startEditTransaction(entry)}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              className="secondary"
+                              onClick={() => removeTransaction(entry)}
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </div>
                         
                         <div className="transaction-details">
@@ -758,6 +950,78 @@ export default function Page() {
             </div>
           )}
         </>
+      )}
+
+      {editingTransaction && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h2>Edit Transaction</h2>
+            <label>
+              Customer Name
+              <select
+                value={editTxForm.customerId}
+                onChange={(e) => setEditTxForm({ ...editTxForm, customerId: e.target.value })}
+              >
+                {data.customers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Book Details
+              <select
+                value={editTxForm.bookId}
+                onChange={(e) => setEditTxForm({ ...editTxForm, bookId: e.target.value })}
+              >
+                {data.books.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.title} ({b.status})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Issued At
+              <input
+                type="datetime-local"
+                value={editTxForm.issuedAt}
+                onChange={(e) => setEditTxForm({ ...editTxForm, issuedAt: e.target.value })}
+              />
+            </label>
+            <label className="checkbox-label">
+              <input
+                type="checkbox"
+                checked={editTxForm.isReturned}
+                onChange={(e) => setEditTxForm({ ...editTxForm, isReturned: e.target.checked })}
+              />
+              Returned?
+            </label>
+            {editTxForm.isReturned && (
+              <label>
+                Returned At
+                <input
+                  type="datetime-local"
+                  value={editTxForm.returnedAt}
+                  onChange={(e) => setEditTxForm({ ...editTxForm, returnedAt: e.target.value })}
+                />
+              </label>
+            )}
+            <div className="actions">
+              <button type="button" onClick={handleEditTransactionSave}>
+                Save Changes
+              </button>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => setEditingTransaction(null)}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </main>
   );

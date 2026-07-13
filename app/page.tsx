@@ -89,6 +89,18 @@ export default function Page() {
     document.documentElement.setAttribute('data-theme', newTheme);
   };
 
+  const handleCustomerClick = (customerId: string) => {
+    setActiveTab('customers');
+    setTimeout(() => {
+      const el = document.getElementById(`customer-card-${customerId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('highlight-flash');
+        setTimeout(() => el.classList.remove('highlight-flash'), 2000);
+      }
+    }, 100);
+  };
+
   const [activeTab, setActiveTab] = useState<'books' | 'customers' | 'transactions' | 'history'>('books');
   const [data, setData] = useState<LibraryData>(defaultData);
   const [isLoading, setIsLoading] = useState(true);
@@ -119,9 +131,22 @@ export default function Page() {
         timestamp: tx.timestamp ?? '',
       }));
 
+      const membershipOrder: Record<'Gold' | 'Silver' | 'Standard', number> = {
+        Gold: 1,
+        Silver: 2,
+        Standard: 3,
+      };
+
+      const sortedCustomers = (customersResult.data ?? []).sort((a: any, b: any) => {
+        const orderA = membershipOrder[a.membership as 'Gold' | 'Silver' | 'Standard'] ?? 99;
+        const orderB = membershipOrder[b.membership as 'Gold' | 'Silver' | 'Standard'] ?? 99;
+        if (orderA !== orderB) return orderA - orderB;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+
       setData({
         books: booksResult.data ?? [],
-        customers: customersResult.data ?? [],
+        customers: sortedCustomers,
         transactions: mappedTransactions,
       });
     } catch (err: any) {
@@ -582,7 +607,7 @@ export default function Page() {
                   <div className="empty">No customers added yet.</div>
                 ) : (
                   data.customers.map((customer) => (
-                    <article key={customer.id} className="item-card">
+                    <article key={customer.id} id={`customer-card-${customer.id}`} className="item-card">
                       <div>
                         <strong>{customer.name}</strong>
                         <p>{customer.email} · {customer.phone}</p>
@@ -680,8 +705,19 @@ export default function Page() {
                         
                         <div className="transaction-details">
                           <div className="detail-section">
-                            <span className="section-label">Borrower</span>
-                            <strong className="detail-name">{customer?.name ?? 'Unknown'}</strong>
+                            <span className="section-label">Customer Name</span>
+                            {customer ? (
+                              <button
+                                type="button"
+                                className="link-button detail-name"
+                                onClick={() => handleCustomerClick(customer.id)}
+                                title="Click to view customer details"
+                              >
+                                {customer.name}
+                              </button>
+                            ) : (
+                              <strong className="detail-name">Unknown</strong>
+                            )}
                             {customer && <span className="badge membership-badge-small">{customer.membership}</span>}
                           </div>
                           

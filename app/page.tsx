@@ -747,26 +747,38 @@ export default function Page() {
                 {data.customers.length === 0 ? (
                   <div className="empty">No customers added yet.</div>
                 ) : (
-                  data.customers.map((customer) => (
-                    <article key={customer.id} id={`customer-card-${customer.id}`} className="item-card customer-item-card">
-                      <div className="customer-card-main">
-                        <div>
-                          <strong>{customer.name}</strong>
-                          <p>{customer.email} · {customer.phone}</p>
-                          <span className="badge">{customer.membership}</span>
+                  data.customers.map((customer) => {
+                    const hasUnreturnedBook = groupedTransactions.some(
+                      (tx) => tx.customerId === customer.id && tx.issuedAt !== null && tx.returnedAt === null
+                    );
+                    return (
+                      <article key={customer.id} id={`customer-card-${customer.id}`} className="item-card customer-item-card">
+                        <div className="customer-card-main">
+                          <div>
+                            <strong>{customer.name}</strong>
+                            <p>{customer.email} · {customer.phone}</p>
+                            <span className="badge">{customer.membership}</span>
+                          </div>
+                          <div className="item-actions">
+                            {hasUnreturnedBook && (
+                              <img
+                                src="/images.png"
+                                alt="Pending Return"
+                                className="pending-icon"
+                                title="Has pending book return"
+                              />
+                            )}
+                            <button type="button" className="secondary" onClick={() => toggleCustomerHistory(customer.id)}>
+                              {expandedCustomerHistory[customer.id] ? 'Hide History' : 'History'}
+                            </button>
+                            <button type="button" onClick={() => setEditingCustomerId(customer.id)}>
+                              Edit
+                            </button>
+                            <button type="button" className="secondary" onClick={() => removeCustomer(customer.id)}>
+                              Delete
+                            </button>
+                          </div>
                         </div>
-                        <div className="item-actions">
-                          <button type="button" className="secondary" onClick={() => toggleCustomerHistory(customer.id)}>
-                            {expandedCustomerHistory[customer.id] ? 'Hide History' : 'History'}
-                          </button>
-                          <button type="button" onClick={() => setEditingCustomerId(customer.id)}>
-                            Edit
-                          </button>
-                          <button type="button" className="secondary" onClick={() => removeCustomer(customer.id)}>
-                            Delete
-                          </button>
-                        </div>
-                      </div>
                       
                       {expandedCustomerHistory[customer.id] && (
                         <div className="customer-history-section">
@@ -799,7 +811,8 @@ export default function Page() {
                         </div>
                       )}
                     </article>
-                  ))
+                  );
+                })
                 )}
               </section>
             </div>

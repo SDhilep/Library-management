@@ -685,6 +685,14 @@ export default function Page() {
                           <span className={book.status === 'Issued' ? 'badge issued' : 'badge available'}>{book.status}</span>
                         </div>
                         <div className="item-actions">
+                          {book.status === 'Issued' && (
+                            <img
+                              src="/images.png"
+                              alt="Pending Return"
+                              className="pending-icon"
+                              title="Book is currently issued"
+                            />
+                          )}
                           <button type="button" className="secondary" onClick={() => toggleBookHistory(book.id)}>
                             {expandedBookHistory[book.id] ? 'Hide History' : 'History'}
                           </button>

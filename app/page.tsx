@@ -129,6 +129,7 @@ export default function Page() {
     isReturned: false,
   });
   const [expandedCustomerHistory, setExpandedCustomerHistory] = useState<{ [customerId: string]: boolean }>({});
+  const [expandedBookHistory, setExpandedBookHistory] = useState<{ [bookId: string]: boolean }>({});
 
   const fetchData = useCallback(async () => {
     setIsLoading(true);
@@ -444,6 +445,13 @@ export default function Page() {
     }));
   };
 
+  const toggleBookHistory = (bookId: string) => {
+    setExpandedBookHistory((prev) => ({
+      ...prev,
+      [bookId]: !prev[bookId],
+    }));
+  };
+
   const removeTransaction = async (entry: any) => {
     if (!confirm('Are you sure you want to delete this transaction record?')) return;
     try {
@@ -669,20 +677,56 @@ export default function Page() {
                   <div className="empty">No books added yet.</div>
                 ) : (
                   data.books.map((book) => (
-                    <article key={book.id} className="item-card">
-                      <div>
-                        <strong>{book.title}</strong>
-                        <p>{book.author} · {book.genre}</p>
-                        <span className={book.status === 'Issued' ? 'badge issued' : 'badge available'}>{book.status}</span>
+                    <article key={book.id} className="item-card book-item-card">
+                      <div className="book-card-main">
+                        <div>
+                          <strong>{book.title}</strong>
+                          <p>{book.author} · {book.genre}</p>
+                          <span className={book.status === 'Issued' ? 'badge issued' : 'badge available'}>{book.status}</span>
+                        </div>
+                        <div className="item-actions">
+                          <button type="button" className="secondary" onClick={() => toggleBookHistory(book.id)}>
+                            {expandedBookHistory[book.id] ? 'Hide History' : 'History'}
+                          </button>
+                          <button type="button" onClick={() => setEditingBookId(book.id)}>
+                            Edit
+                          </button>
+                          <button type="button" className="secondary" onClick={() => removeBook(book.id)}>
+                            Delete
+                          </button>
+                        </div>
                       </div>
-                      <div className="item-actions">
-                        <button type="button" onClick={() => setEditingBookId(book.id)}>
-                          Edit
-                        </button>
-                        <button type="button" className="secondary" onClick={() => removeBook(book.id)}>
-                          Delete
-                        </button>
-                      </div>
+                      
+                      {expandedBookHistory[book.id] && (
+                        <div className="customer-history-section">
+                          <h4>Borrowing History</h4>
+                          {(() => {
+                            const bookHistory = groupedTransactions.filter((tx) => tx.bookId === book.id);
+                            if (bookHistory.length === 0) {
+                              return <p className="no-history-text">No borrowing history found.</p>;
+                            }
+                            return (
+                              <div className="customer-history-list">
+                                {bookHistory.map((item) => {
+                                  const customer = data.customers.find((c) => c.id === item.customerId);
+                                  return (
+                                    <div key={item.id} className="history-list-item">
+                                      <span className="history-book-title">{customer?.name ?? 'Unknown Customer'}</span>
+                                      <div className="history-dates">
+                                        <span>Issued: {formatTimestamp(item.issuedAt)}</span>
+                                        <span>Returned: {item.returnedAt ? formatTimestamp(item.returnedAt) : 'Pending'}</span>
+                                      </div>
+                                      <span className={`badge history-status-badge ${item.returnedAt ? 'returned' : 'borrowed'}`}>
+                                        {item.returnedAt ? 'Returned' : 'Active'}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
                     </article>
                   ))
                 )}

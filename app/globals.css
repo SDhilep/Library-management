@@ -494,6 +494,7 @@ button.secondary:hover {
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
+  align-items: stretch;
   gap: 1.25rem;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
@@ -780,13 +781,15 @@ button.secondary:hover {
 }
 
 /* Customer Item Card Adjustments for expanded History */
-.customer-item-card {
+.customer-item-card,
+.book-item-card {
   flex-direction: column;
   align-items: stretch;
   gap: 0;
 }
 
-.customer-card-main {
+.customer-card-main,
+.book-card-main {
   display: flex;
   justify-content: space-between;
   align-items: center;
